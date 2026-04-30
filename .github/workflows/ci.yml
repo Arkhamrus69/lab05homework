@@ -2,53 +2,57 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
   pull_request:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        compiler:
-          - cxx: g++
-            cc: gcc
-          - cxx: clang++
-            cc: clang
-        exclude:
-          - os: macos-latest
-            compiler:
-              cxx: g++
-              cc: gcc
+  build-and-test:
+    name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y cmake
-
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: brew install cmake
-
-      - name: Configure CMake
+      - name: Install coverage tools on Linux
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          cmake -B build \
-            -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} \
-            -DCMAKE_C_COMPILER=${{ matrix.compiler.cc }}
+          sudo apt-get update
+          sudo apt-get install -y lcov
 
-      - name: Build
-        run: cmake --build build
+      - name: Configure project
+        run: cmake -S . -B _build -DBUILD_TESTS=ON -DCOLLECT_COVERAGE=ON -DCMAKE_BUILD_TYPE=Debug
 
-      - name: Run hello_world
+      - name: Build project
+        run: cmake --build _build
+
+      - name: Run tests
+        run: ctest --test-dir _build --output-on-failure --verbose
+
+      - name: Generate coverage report
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          cd build
-          ./hello_world/hello_world
+          lcov --capture --directory _build --output-file coverage.info
+          lcov --remove coverage.info '/usr/*' '*/third-party/*' '*/tests/*' --output-file coverage.info
+          lcov --list coverage.info
 
-      - name: Run solver
-        run: |
-          cd build
-          ./solver/solver
+      - name: Upload coverage to Coveralls
+        if: matrix.os == 'ubuntu-latest'
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: coverage.info
