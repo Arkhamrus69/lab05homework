@@ -1,5 +1,6 @@
 [![CI](https://github.com/Arkhamrus69/lab05homework/actions/workflows/ci.yml/badge.svg)](https://github.com/Arkhamrus69/lab05homework/actions/workflows/ci.yml)
 [![Coverage Status](https://coveralls.io/repos/github/Arkhamrus69/lab05homework/badge.svg?branch=main)](https://coveralls.io/github/Arkhamrus69/lab05homework?branch=main)
+
 #Проверочка 1:
 ```sh
 Internal ctest changing into directory: /home/vboxuser/Рабочий стол/arkhamrus69@gmail.com/workspace/projects/lab05homework/_build
