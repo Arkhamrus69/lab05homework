@@ -11,16 +11,32 @@ on:
       - master
 
 jobs:
-  build-and-test:
-    name: ${{ matrix.os }}
+  build:
+    name: ${{ matrix.os }} / ${{ matrix.cxx }}
     runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
+        include:
+          - os: ubuntu-latest
+            cc: gcc
+            cxx: g++
+            coverage: ON
+
+          - os: ubuntu-latest
+            cc: clang
+            cxx: clang++
+            coverage: OFF
+
+          - os: macos-latest
+            cc: clang
+            cxx: clang++
+            coverage: OFF
+
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
 
     steps:
       - name: Checkout repository
@@ -28,30 +44,41 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install coverage tools on Linux
+      - name: Install dependencies Linux
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y lcov
 
-      - name: Configure project
-        run: cmake -S . -B _build -DBUILD_TESTS=ON -DCOLLECT_COVERAGE=ON -DCMAKE_BUILD_TYPE=Debug
+      - name: Show versions
+        run: |
+          cmake --version
+          $CXX --version
 
-      - name: Build project
-        run: cmake --build _build
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build \
+            -DBUILD_TESTS=ON \
+            -DCOLLECT_COVERAGE=${{ matrix.coverage }} \
+            -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build
+        run: |
+          cmake --build build
 
       - name: Run tests
-        run: ctest --test-dir _build --output-on-failure --verbose
+        run: |
+          ctest --test-dir build --output-on-failure --verbose
 
       - name: Generate coverage report
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' && matrix.cxx == 'g++'
         run: |
-          lcov --capture --directory _build --output-file coverage.info
+          lcov --capture --directory build --output-file coverage.info
           lcov --remove coverage.info '/usr/*' '*/third-party/*' '*/tests/*' --output-file coverage.info
           lcov --list coverage.info
 
       - name: Upload coverage to Coveralls
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' && matrix.cxx == 'g++'
         uses: coverallsapp/github-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
